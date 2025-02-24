@@ -1,0 +1,41 @@
+task: detection
+
+evaluator:
+  type: CocoEvaluator
+  iou_types: ['bbox', ]
+
+num_classes: 80
+remap_mscoco_category: True
+
+train_dataloader: 
+  type: DataLoader
+  dataset: 
+    type: CocoDetection
+    img_folder: /home/starcraftvs/Datasets/DEIM_sample/some/images/train
+    ann_file: /home/starcraftvs/Datasets/DEIM_sample/some/instances_train2017_2d_rtdetr_auto1.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: True
+  num_workers: 1
+  drop_last: True 
+  collate_fn:
+    type: BatchImageCollateFunction
+
+
+val_dataloader:
+  type: DataLoader
+  dataset: 
+    type: CocoDetection
+    img_folder: /home/starcraftvs/Datasets/DEIM_sample/some/images/val
+    ann_file: /home/starcraftvs/Datasets/DEIM_sample/some/instances_val2017_2d_rtdetr_auto1.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~ 
+  shuffle: False
+  num_workers: 1
+  drop_last: False
+  collate_fn:
+    type: BatchImageCollateFunction
