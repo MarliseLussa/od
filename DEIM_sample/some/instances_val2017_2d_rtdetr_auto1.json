@@ -1,0 +1,129 @@
+{
+    "images": [
+        {
+            "file_name": "/home/starcraftvs/Datasets/DEIM_sample/some/images/val/2024-04-18-14-53-49-881_FrontWide.jpeg",
+            "height": 2160,
+            "width": 3840,
+            "id": 0
+        },
+        {
+            "file_name": "/home/starcraftvs/Datasets/DEIM_sample/some/images/val/2024-04-18-14-53-46-881_FrontWide.jpeg",
+            "height": 2160,
+            "width": 3840,
+            "id": 1
+        }
+    ],
+    "annotations": [
+        {
+            "id": 0,
+            "category_id": 6,
+            "bbox": [
+                2338.18,
+                1122.62,
+                61.30000000000018,
+                48.700000000000045
+            ],
+            "area": 2985.3100000000118,
+            "iscrowd": 0,
+            "image_id": 0
+        },
+        {
+            "id": 1,
+            "category_id": 6,
+            "bbox": [
+                1052.95,
+                1144.45,
+                190.15999999999985,
+                72.83999999999992
+            ],
+            "area": 13851.254399999974,
+            "iscrowd": 0,
+            "image_id": 0
+        },
+        {
+            "id": 2,
+            "category_id": 6,
+            "bbox": [
+                2319.27,
+                1131.86,
+                64.07000000000016,
+                53.2800000000002
+            ],
+            "area": 3413.6496000000216,
+            "iscrowd": 0,
+            "image_id": 1
+        }
+    ],
+    "categories": [
+        {
+            "supercategory": "Cyclist",
+            "id": 0,
+            "name": "Cyclist"
+        },
+        {
+            "supercategory": "Pedestrian",
+            "id": 1,
+            "name": "Pedestrian"
+        },
+        {
+            "supercategory": "Pole",
+            "id": 2,
+            "name": "Pole"
+        },
+        {
+            "supercategory": "Cone",
+            "id": 3,
+            "name": "Cone"
+        },
+        {
+            "supercategory": "AntiCollisionDrum",
+            "id": 4,
+            "name": "AntiCollisionDrum"
+        },
+        {
+            "supercategory": "WaterHorse",
+            "id": 5,
+            "name": "WaterHorse"
+        },
+        {
+            "supercategory": "Car",
+            "id": 6,
+            "name": "Car"
+        },
+        {
+            "supercategory": "Bus",
+            "id": 7,
+            "name": "Bus"
+        },
+        {
+            "supercategory": "Truck",
+            "id": 8,
+            "name": "Truck"
+        },
+        {
+            "supercategory": "Van",
+            "id": 9,
+            "name": "Van"
+        },
+        {
+            "supercategory": "CombinationVehicle",
+            "id": 10,
+            "name": "CombinationVehicle"
+        },
+        {
+            "supercategory": "Other",
+            "id": 11,
+            "name": "Other"
+        },
+        {
+            "supercategory": "Tricycle",
+            "id": 12,
+            "name": "Tricycle"
+        },
+        {
+            "supercategory": "TriangleSign",
+            "id": 13,
+            "name": "TriangleSign"
+        }
+    ]
+}

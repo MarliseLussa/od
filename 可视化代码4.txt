@@ -1,0 +1,198 @@
+#!/usr/bin/env python
+# -*- coding:utf-8 -*-
+# 高书记，泊车od avm可视化在slotpipline/utils/avm_visualizer.py，slot_show_label，L101-L124，代码仓http://10.133.122.81/autolabelingpool/parkingsem/slotpipline。目前因为拉取数据表问题，只能在clever跑。
+import os
+import cv2
+import numpy as np
+from tqdm import tqdm
+from utils.utils import read_json
+from utils.avm_utils import rle_decode, AVMSEG_COLORMAP, AVMSLOT_CATEGORY, AVMSEG_CATEGORY, COLOR_SEG_LIST, COLOR_SLOT_LIST
+from utils.parking_od_annotation_formating import SUBCATEGORY2CAT
+from utils.convert_slot_pts_to_ego_pts import convert_ego_pts_to_slot_pts
+
+class AVMVisualizer(object):
+    def __init__(self, src_data, ctr_to_wheel_arc, annos_dir, visulize_dir):
+        self.src_data = src_data
+        self.ctr_to_wheel_arc = ctr_to_wheel_arc
+        self.annos_dir = annos_dir
+        self.visulize_dir = visulize_dir
+
+    def run(self, only_mapping=False):
+        self.draw_det_msg()
+        self.slot_show_label(only_mapping)
+
+    def slot_show_label(self, only_mapping):
+        save_dir = os.path.join(self.visulize_dir, 'slot_show')
+        os.makedirs(save_dir, exist_ok=True)
+        # label_avm_seg_dir = os.path.join(self.cache_dir, 'label_avm_seg')
+        # label_avm_slot_dir = os.path.join(self.cache_dir, 'label_avm_slot')
+        label_avm_map = os.path.join(self.annos_dir,  'map.json')
+        # with open(label_avm_map, 'r') as f:
+        #     avm_map_data = json.load(f)
+        avm_map_data = read_json(label_avm_map)
+        for file_id in tqdm(self.src_data, desc="slot_show_label"):
+
+   
+            # avm_img = cv2.imread(self.src_data[file_id]['avm_path'])
+            # get avm img path, and read img
+            avm_info = None
+            for img_info in self.src_data[file_id]['images']:
+                if img_info['title'] == 'cam_avm':
+                    avm_info = img_info
+                    break
+            assert avm_info is not None
+            avm_img_path = avm_info['url']
+            avm_img_path = avm_img_path.replace('https://s3-zz-prda.sail-cloud.com/prod-ac-es39-1-sjjg', '/clever/oss-volumes/pvc-oss-prod-ac-es39-1-sjjg-readonly')
+            avm_img = cv2.imread(avm_img_path)
+
+            #get anno dict
+            annotations = {}
+            for item in avm_map_data['annotation']:
+                annotations[item['uuid']] = item
+            
+            # drow marking in img
+            for mark_uuid in avm_map_data['elements']['marking']:
+                # print(mark_uuid)
+                anno = annotations[mark_uuid]
+                anno_polygon = np.array(anno['polygon'])
+                #conv anno_polygon from map to vechile 
+                zero_column = np.zeros((anno_polygon.shape[0], 1))
+                one_column = np.ones((anno_polygon.shape[0], 1))
+                anno_polygon_homo = np.hstack((anno_polygon, zero_column, one_column))
+                anno_polygon_vec = np.linalg.inv(self.src_data[file_id]['pose']) @ anno_polygon_homo.T
+                anno_polygon_vec = anno_polygon_vec.T
+                #conv anno_polygon from vechile to img
+                anno_polygon_vec_img = convert_ego_pts_to_slot_pts(anno_polygon_vec[:,:2], self.ctr_to_wheel_arc)
+                anno_polygon_vec_img = anno_polygon_vec_img.astype(np.int32)
+                clss = anno['category']
+                color_idx = AVMSEG_CATEGORY.index(clss)
+                color = COLOR_SEG_LIST[str(color_idx)]
+                cv2.drawContours(avm_img, [np.expand_dims(anno_polygon_vec_img, axis = 1)], -1, color, 1)
+
+            # drow slot in img
+            for slot_uuid in avm_map_data['elements']['slot']:
+                # print(slot_uuid)
+                anno = annotations[slot_uuid]
+                anno_polygon = np.array(anno['polygon'])  # 4 points
+                #conv anno_polygon from map to vechile 
+                zero_column = np.zeros((anno_polygon.shape[0], 1))
+                one_column = np.ones((anno_polygon.shape[0], 1))
+                anno_polygon_homo = np.hstack((anno_polygon, zero_column, one_column))
+                anno_polygon_vec = np.linalg.inv(self.src_data[file_id]['pose']) @ anno_polygon_homo.T
+                anno_polygon_vec = anno_polygon_vec.T
+                #conv anno_polygon from vechile to img
+                anno_polygon_vec_img = convert_ego_pts_to_slot_pts(anno_polygon_vec[:,:2], self.ctr_to_wheel_arc)
+                anno_polygon_vec_img = anno_polygon_vec_img.astype(np.int32)
+                clss = anno['category']
+                try:
+                    color_idx = AVMSLOT_CATEGORY.index(clss)
+                    color = COLOR_SLOT_LIST[str(color_idx)]
+                    po1, po2, po3, po4 = anno_polygon_vec_img[:][0], anno_polygon_vec_img[:][1], anno_polygon_vec_img[:][2],anno_polygon_vec_img[:][3]
+                    cv2.line(avm_img, tuple(po1), tuple(po2), color)
+                    cv2.line(avm_img, tuple(po2), tuple(po3), color)
+                    cv2.line(avm_img, tuple(po3), tuple(po4), color)
+                    cv2.line(avm_img, tuple(po4), tuple(po1), color)
+                except:
+                    color = (70, 70, 70)
+                    po1, po2 = anno_polygon_vec_img[:][0], anno_polygon_vec_img[:][1]
+                    cv2.line(avm_img, tuple(po1), tuple(po2), color)
+                # cv2.drawContours(avm_img, [np.expand_dims(anno_polygon_vec_img, axis = 1)], -1, (0, 255, 0), 1)
+            
+            if not only_mapping:
+                anno_json_path = os.path.join(self.annos_dir, 'annos_frame', f'{file_id}.json')
+                anno_json = read_json(anno_json_path)
+                for obj in anno_json['annotations']:
+                    if 'sub_category' in obj.keys() and obj['sub_category'] in SUBCATEGORY2CAT.keys():
+                        try:
+                            center = np.array(obj['pose'])[:2]
+                            size = np.array(obj['size'])[:2]
+                            bottomleft = center-size
+                            topright   = center+size
+                            allpo = np.vstack([center, bottomleft, topright])
+                            avm_po = convert_ego_pts_to_slot_pts(allpo, self.ctr_to_wheel_arc)
+                            import math
+                            avm_size= (avm_po[2,:]-avm_po[1,:])/2
+                            rect = (tuple(avm_po[0, :]), tuple(avm_size), -obj['rotation'][2]*180/ math.pi)
+                            avm_box = cv2.boxPoints(rect)
+                            avm_box = avm_box.astype(np.int32)
+                            cv2.polylines(avm_img, [avm_box], isClosed=True, color=(0,0,255), thickness=3)
+                        except Exception as e:
+                            try:
+                                avm_center = avm_po[0, :].astype(np.int32) 
+                                cv2.circle(avm_img, tuple(avm_center), 10, (255,0,0), thickness=3)
+                            except Exception as e:
+                                pass
+                            
+
+
+            # cv2.imwrite('test.jpg', avm_img)
+
+
+            # avm_seg_label['valid_area'].append(avm_seg_label['valid_area'][0])
+            # valid_area_ego = np.array(avm_seg_label['valid_area'])
+            # valid_area_img = convert_ego_pts_to_slot_pts(valid_area_ego, self.ctr_to_wheel_arc)
+            # valid_area_img = np.round(valid_area_img).astype(int)
+            # for idx in range(len(valid_area_img)-1):
+            #     cv2.line(avm_img, valid_area_img[idx], valid_area_img[idx+1], (0,0,255), thickness=2)
+
+            # avm_seg_ego = np.array(avm_seg_label['points'])
+            # avm_seg_img = convert_ego_pts_to_slot_pts(avm_seg_ego, self.ctr_to_wheel_arc)
+            # avm_seg_img = np.round(avm_seg_img).astype(int)
+            # for idx in range(len(avm_seg_img)):
+            #     cv2.circle(avm_img, avm_seg_img[idx], 1, (255,0,0))
+
+            # for slot in avm_slot_label['slot']:
+            #     polygon_ego = np.array(slot['polygon'])
+            #     polygon_img = convert_ego_pts_to_slot_pts(polygon_ego, self.ctr_to_wheel_arc)
+            #     polygon_img = np.round(polygon_img).astype(int)
+            #     cv2.line(avm_img, polygon_img[0], polygon_img[1], (0,255,255), thickness=2)
+            #     cv2.line(avm_img, polygon_img[1], polygon_img[2], (255,0,255), thickness=2)
+            #     cv2.line(avm_img, polygon_img[2], polygon_img[3], (255,255,0), thickness=2)
+            #     cv2.line(avm_img, polygon_img[3], polygon_img[0], (100,100,100), thickness=2)
+
+            #     if slot['stopper_flag'][0] > 0.5:
+            #         stoper_ego = np.array(slot['stopper'])
+            #         stoper_img = convert_ego_pts_to_slot_pts(stoper_ego, self.ctr_to_wheel_arc)
+            #         stoper_img = np.round(stoper_img).astype(int)
+            #         cv2.line(avm_img, stoper_img[0], stoper_img[1], (200,200,200), thickness=2)
+
+            cv2.imwrite(os.path.join(save_dir, file_id.replace('.pcd', '.jpg')), avm_img)   
+
+    def draw_det_msg(self):
+
+        save_dir = os.path.join(self.visulize_dir, 'slot_show_det')
+        os.makedirs(save_dir, exist_ok=True)
+        for file_id in tqdm(self.src_data, desc="slot_show_det"):
+            avm_info = None
+            for img_info in self.src_data[file_id]['images']:
+                if img_info['title'] == 'cam_avm':
+                    avm_info = img_info
+                    break
+            assert avm_info is not None
+            avm_img_path = avm_info['url']
+            avm_img_path = avm_img_path.replace('https://s3-zz-prda.sail-cloud.com/prod-ac-es39-1-sjjg', '/clever/oss-volumes/pvc-oss-prod-ac-es39-1-sjjg-readonly')
+            avm_img = cv2.imread(avm_img_path)
+
+            # drow marking in img
+            avmseg_res = self.src_data[file_id]['avmseg_infer_res']
+            seg = rle_decode(avmseg_res['encoded_output'], avmseg_res['mask_h'], avmseg_res['mask_w'])
+            colored_output = AVMSEG_COLORMAP[seg]
+            # 使用掩码创建一个反向掩码，用于保持 img1 在掩码外的区域不变
+            mask_inv = cv2.bitwise_not(colored_output)
+            combined_image = cv2.addWeighted(avm_img, 0.5, colored_output, 0.5, 0)
+
+            result = cv2.bitwise_and(combined_image, colored_output)
+            avm_img_with_mask = cv2.bitwise_or(result, cv2.bitwise_and(avm_img, mask_inv))
+
+            # drow slot in img
+            for slot in self.src_data[file_id]['avmslot_infer_res']:
+                slot_pts = np.array(slot['polygon'], dtype=np.int16).reshape(4,2)
+                cv2.line(avm_img_with_mask, slot_pts[0], slot_pts[1], [255,0,0], thickness=2)
+                cv2.line(avm_img_with_mask, slot_pts[1], slot_pts[2], [0,255,255], thickness=2)
+                cv2.line(avm_img_with_mask, slot_pts[2], slot_pts[3], [0,255,255], thickness=2)
+                cv2.line(avm_img_with_mask, slot_pts[3], slot_pts[0], [0,255,255], thickness=2)
+                if slot['stopper_flag'][0] > 0.5:
+                    stopper_pts = np.array(slot['stopper'], dtype=np.int16).reshape(2,2)
+                    cv2.line(avm_img_with_mask, stopper_pts[0], stopper_pts[1], [0,0,255], thickness=2)
+
+            cv2.imwrite(os.path.join(save_dir, file_id.replace('.pcd', '.jpg')), avm_img_with_mask)   
